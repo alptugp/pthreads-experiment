@@ -169,9 +169,51 @@
     for(int i = 1 ; i < tmp.width - 1; i++){
       for(int j = 1 ; j < tmp.height - 1; j++){
         //TODO: set-up work and dispatch to a pthread
+        struct task_args *params = (struct task_args*) malloc(sizeof(struct task_args)); 
+        params->pic = pic;
+        params->tmp = tmp;
+        params->i = i;
+        params->j = j;
+
+        pthread_t thread;
+        pthread_create(&thread, NULL, task, params);
+        pthread_join(thread, NULL);  
+        free(params);
       }
     }    
     
     // temporary picture clean-up
     clear_picture(&tmp);
+  }
+
+  void *task(void *args_ptr) {
+    struct task_args *args = (struct task_args *) args_ptr;
+    struct picture *pic = (struct picture *) args->pic;
+    struct picture tmp = (struct picture) args->tmp;
+    int i = (int) args->i;
+    int j = (int) args->j;
+
+    // set-up a local pixel on the stack
+    struct pixel rgb;  
+    int sum_red = 0;
+    int sum_green = 0;
+    int sum_blue = 0;
+
+    // check the surrounding pixel region
+    for(int n = -1; n <= 1; n++){
+      for(int m = -1; m <= 1; m++){
+        rgb = get_pixel(&tmp, i+n, j+m);
+        sum_red += rgb.red;
+        sum_green += rgb.green;
+        sum_blue += rgb.blue;
+      }
+    }
+
+    // compute average pixel RGB value
+    rgb.red = sum_red / BLUR_REGION_SIZE;
+    rgb.green = sum_green / BLUR_REGION_SIZE;
+    rgb.blue = sum_blue / BLUR_REGION_SIZE;
+
+    // set pixel to region average RBG value
+    set_pixel(pic, i, j, &rgb);
   }
