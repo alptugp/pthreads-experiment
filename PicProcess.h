@@ -13,14 +13,7 @@
   void flip_picture(struct picture *pic, char plane);
   void blur_picture(struct picture *pic);
   void parallel_blur_picture(struct picture *pic);
-  void *task(void *args_ptr);
-
-  struct task_args {
-    struct picture *pic;
-    struct picture tmp;
-    int i;
-    int j;
-  };
+  void pixel_blurring_task(void *args_ptr);
 
 #endif
 

@@ -1,8 +1,16 @@
 #include "PicProcess.h"
+#include "Thpool.h"
 
   #define NO_RGB_COMPONENTS 3
   #define BLUR_REGION_SIZE 9
+  #define MAX_RUNNING_THREAD_SIZE 12
 
+  struct pixel_blurring_task_args {
+    struct picture *pic;
+    struct picture tmp;
+    int i;
+    int j;
+  };
 
   void invert_picture(struct picture *pic){
     // iterate over each pixel in the picture
@@ -127,7 +135,7 @@
     // iterate over each pixel in the picture (ignoring boundary pixels)
     for(int i = 1 ; i < tmp.width - 1; i++){
       for(int j = 1 ; j < tmp.height - 1; j++){
-        
+
         // set-up a local pixel on the stack
         struct pixel rgb;  
         int sum_red = 0;
@@ -163,42 +171,32 @@
     struct picture tmp;
     tmp.img = copy_image(pic->img);
     tmp.width = pic->width;
-    tmp.height = pic->height; 
-    
-    pthread_t th[tmp.width][tmp.height];
-    struct task_args arg_array[tmp.width][tmp.height];
+    tmp.height = pic->height;   
+
+    threadpool thpool = thpool_init(MAX_RUNNING_THREAD_SIZE);
     
     // iterate over each pixel in the picture (ignoring boundary pixels)
     for(int i = 1 ; i < tmp.width - 1; i++){
       for(int j = 1 ; j < tmp.height - 1; j++){
-        //TODO: set-up work and dispatch to a pthread
-        /*struct task_args *params = (struct task_args*) malloc(sizeof(struct task_args)); 
+        struct pixel_blurring_task_args *params = (struct pixel_blurring_task_args*) malloc(sizeof(struct pixel_blurring_task_args)); 
         params->pic = pic;
         params->tmp = tmp;
         params->i = i;
         params->j = j;
-        */
 
-        // pthread_t thread;
-
-        struct task_args params = {pic, tmp, i, j};
-        arg_array[i][j] = params;
-        pthread_create(&th[i][j], NULL, task, &params);
+        thpool_add_work(thpool, (void *) pixel_blurring_task, (void *) params);
       }
-    }    
+    }
+        
+    thpool_wait(thpool);
+    thpool_destroy(thpool);  
 
-    for(int i = 1 ; i < tmp.width - 1; i++) {
-      for(int j = 1 ; j < tmp.height - 1; j++) {
-        pthread_join(th[i][j], NULL);  
-      }
-    }    
-    
     // temporary picture clean-up
     clear_picture(&tmp);
   }
 
-  void *task(void *args_ptr) {
-    struct task_args *args = (struct task_args *) args_ptr;
+  void pixel_blurring_task(void *args_ptr) {
+    struct pixel_blurring_task_args *args = (struct pixel_blurring_task_args *) args_ptr;
     struct picture *pic = (struct picture *) args->pic;
     struct picture tmp = (struct picture) args->tmp;
     int i = (int) args->i;
@@ -227,4 +225,6 @@
 
     // set pixel to region average RBG value
     set_pixel(pic, i, j, &rgb);
+
+    free(args);
   }
