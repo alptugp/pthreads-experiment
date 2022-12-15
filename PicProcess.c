@@ -165,20 +165,31 @@
     tmp.width = pic->width;
     tmp.height = pic->height; 
     
+    pthread_t th[tmp.width][tmp.height];
+    struct task_args arg_array[tmp.width][tmp.height];
+    
     // iterate over each pixel in the picture (ignoring boundary pixels)
     for(int i = 1 ; i < tmp.width - 1; i++){
       for(int j = 1 ; j < tmp.height - 1; j++){
         //TODO: set-up work and dispatch to a pthread
-        struct task_args *params = (struct task_args*) malloc(sizeof(struct task_args)); 
+        /*struct task_args *params = (struct task_args*) malloc(sizeof(struct task_args)); 
         params->pic = pic;
         params->tmp = tmp;
         params->i = i;
         params->j = j;
+        */
 
-        pthread_t thread;
-        pthread_create(&thread, NULL, task, params);
-        pthread_join(thread, NULL);  
-        free(params);
+        // pthread_t thread;
+
+        struct task_args params = {pic, tmp, i, j};
+        arg_array[i][j] = params;
+        pthread_create(&th[i][j], NULL, task, &params);
+      }
+    }    
+
+    for(int i = 1 ; i < tmp.width - 1; i++) {
+      for(int j = 1 ; j < tmp.height - 1; j++) {
+        pthread_join(th[i][j], NULL);  
       }
     }    
     
