@@ -9,6 +9,7 @@
 
 #define BLUR_REGION_SIZE 9
 #define MAX_RUNNING_THREAD_SIZE 12
+#define max(a, b) ((a) > (b) ? (a) : (b))
 
 struct col_blurring_task_args {
   struct picture *pic;
@@ -22,19 +23,31 @@ struct row_blurring_task_args {
   int row;
 };
 
+struct sector_blurring_task_args {
+  struct picture *pic;
+  struct picture *tmp;
+  int width_start;
+  int heigth_start;
+  int width_sector_size;
+  int heigth_sector_size;
+};
+
 static void pixel_blur(struct picture *pic, struct picture *tmp, int a, int b);
 static long long get_curr_time();
 static void col_blurring_task(void *args_ptr);
 static void parallel_col_blur(struct picture *pic);
 static void row_blurring_task(void *args_ptr);
 static void parallel_row_blur(struct picture *pic);
+static void sector_blurring_task(void *args_ptr);
+static void parallel_sector_blur(struct picture *pic);
 
   // function pointer look-up table for picture transformation functions
   static void (* const cmds[])(struct picture *) = { 
     parallel_row_blur,
     parallel_col_blur,
     parallel_blur_picture,
-    blur_picture
+    blur_picture,
+    parallel_sector_blur
   };
 
   // list of all possible picture transformations
@@ -42,7 +55,8 @@ static void parallel_row_blur(struct picture *pic);
     "parallel_row_blur",
     "parallel_col_blur",
     "parallel_blur_picture",
-    "blur_picture"
+    "blur_picture",
+    "parallel_sector_blur"
   };
 
   // size of look-up table (for safe IO error reporting)
@@ -175,6 +189,65 @@ static void row_blurring_task(void *args_ptr) {
   int row_end = tmp->width - 1;
   for (int a = 1; a < row_end; a++) {
     pixel_blur(pic, tmp, a, row);
+  }
+
+  free(args);
+}
+
+static void parallel_sector_blur(struct picture *pic) {
+  // make temporary copy of picture to work from
+  struct picture tmp;
+  tmp.img = copy_image(pic->img);
+  tmp.width = pic->width;
+  tmp.height = pic->height;  
+
+  threadpool thpool = thpool_init(MAX_RUNNING_THREAD_SIZE);
+
+  int width_sector_size;
+  int heigth_sector_size;
+  if (tmp.width >= tmp.height) {
+    heigth_sector_size = max(tmp.height / 2, 1);
+    width_sector_size = max(tmp.width / 4, 1);
+  } else {
+    heigth_sector_size = max(tmp.height / 4, 1);
+    width_sector_size = max(tmp.width / 2, 1);
+  }
+
+  // iterate over each sector in the picture (ignoring boundary pixels)
+  for (int a = 1; a < tmp.width - 1; a += width_sector_size) {
+    for (int b = 1; b < tmp.height - 1; b += heigth_sector_size) {
+      struct sector_blurring_task_args *params = (struct sector_blurring_task_args*) malloc(sizeof(struct sector_blurring_task_args)); 
+      params->pic = pic;
+      params->tmp = &tmp;
+      params->width_start = a;
+      params->heigth_start = b;
+      params->width_sector_size = width_sector_size;
+      params->heigth_sector_size = heigth_sector_size;
+      
+      thpool_add_work(thpool, (void *) sector_blurring_task, (void *) params);
+    }
+  }
+
+  thpool_wait(thpool);
+  thpool_destroy(thpool);  
+
+  // temporary picture clean-up
+  clear_picture(&tmp);  
+}
+
+static void sector_blurring_task(void *args_ptr) {
+  struct sector_blurring_task_args *args = (struct sector_blurring_task_args *) args_ptr;
+  struct picture *pic = (struct picture *) args->pic;
+  struct picture *tmp = (struct picture *) args->tmp;
+  int width_start = (int) args->width_start;
+  int heigth_start = (int) args->heigth_start;
+  int width_sector_size = (int) args->width_sector_size;
+  int heigth_sector_size = (int) args->heigth_sector_size;
+
+  for (int a = width_start; a < width_start + width_sector_size && a < tmp->width - 1; a++) {
+    for (int b = heigth_start; b < heigth_start + heigth_sector_size && b < tmp->height - 1; b++) {
+      pixel_blur(pic, tmp, a, b);
+    }
   }
 
   free(args);
