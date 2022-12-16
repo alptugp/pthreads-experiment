@@ -8,7 +8,7 @@
 #include <sys/time.h>
 
 #define BLUR_REGION_SIZE 9
-#define MAX_RUNNING_THREAD_SIZE 12
+#define TEST_ITERATIONS 6
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
 struct col_blurring_task_args {
@@ -102,13 +102,20 @@ static void parallel_sector_blur(struct picture *pic);
     }
   
     // dispatch to appropriate picture transformation function
-    long long start = get_curr_time();
-    cmds[cmd_no](&pic);
-    long long end = get_curr_time();
+    int time_sum = 0;
+    for (int iteration = 0; iteration < TEST_ITERATIONS; iteration++) {
+      printf("Iteration %d is running\n", iteration);
+      long long start = get_curr_time();
+      cmds[cmd_no](&pic);
+      long long end = get_curr_time();
+      time_sum += end - start;
+    }
+
+    int average = time_sum / TEST_ITERATIONS;
 
     // save resulting picture and report success
     save_picture_to_file(&pic, target_file);
-    printf("-- Picture has been blurred in %lld milliseconds\n", end - start);
+    printf("-- Picture has been blurred with an average of %d milliseconds\n", average);
     
     clear_picture(&pic);
     return 0;
@@ -121,7 +128,7 @@ static void parallel_col_blur(struct picture *pic) {
   tmp.width = pic->width;
   tmp.height = pic->height;  
   
-  threadpool thpool = thpool_init(MAX_RUNNING_THREAD_SIZE);
+  threadpool thpool = thpool_init(pic->width - 2);
 
   // iterate over each column in the picture (ignoring boundary pixels)
   for(int b = 1 ; b < tmp.width - 1; b++) {
@@ -161,7 +168,7 @@ static void parallel_row_blur(struct picture *pic) {
   tmp.width = pic->width;
   tmp.height = pic->height;  
 
-  threadpool thpool = thpool_init(MAX_RUNNING_THREAD_SIZE);
+  threadpool thpool = thpool_init(pic->height - 2);
 
   // iterate over each row in the picture (ignoring boundary pixels)
   for(int a = 1 ; a < tmp.height - 1; a++) {
@@ -201,7 +208,9 @@ static void parallel_sector_blur(struct picture *pic) {
   tmp.width = pic->width;
   tmp.height = pic->height;  
 
-  threadpool thpool = thpool_init(MAX_RUNNING_THREAD_SIZE);
+  int max_sector_number = 8;
+
+  threadpool thpool = thpool_init(max_sector_number);
 
   int width_sector_size;
   int heigth_sector_size;

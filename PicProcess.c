@@ -3,7 +3,7 @@
 
   #define NO_RGB_COMPONENTS 3
   #define BLUR_REGION_SIZE 9
-  #define MAX_RUNNING_THREAD_SIZE 12
+  #define MAX_RUNNING_THREAD_SIZE 100
 
   struct pixel_blurring_task_args {
     struct picture *pic;
@@ -12,7 +12,7 @@
     int j;
   };
 
-  void invert_picture(struct picture *pic){
+  void invert_picture(struct picture *pic) {
     // iterate over each pixel in the picture
     for(int i = 0 ; i < pic->width; i++){
       for(int j = 0 ; j < pic->height; j++){
@@ -93,7 +93,7 @@
     clear_picture(&tmp);
   }
 
-  void flip_picture(struct picture *pic, char plane){
+  void flip_picture(struct picture *pic, char plane) {
     // make temporary copy of picture to work from
     struct picture tmp;
     tmp.img = copy_image(pic->img);
@@ -125,7 +125,7 @@
     clear_picture(&tmp);
   }
 
-  void blur_picture(struct picture *pic){
+  void blur_picture(struct picture *pic) {
     // make temporary copy of picture to work from
     struct picture tmp;
     tmp.img = copy_image(pic->img);
@@ -166,7 +166,7 @@
     clear_picture(&tmp);
   }
   
-  void parallel_blur_picture(struct picture *pic){
+  void parallel_blur_picture(struct picture *pic) {
     // make temporary copy of picture to work from
     struct picture tmp;
     tmp.img = copy_image(pic->img);
