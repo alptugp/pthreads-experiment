@@ -40,13 +40,16 @@ static void row_blurring_task(void *args_ptr);
 static void parallel_row_blur(struct picture *pic);
 static void sector_blurring_task(void *args_ptr);
 static void parallel_sector_blur(struct picture *pic);
+static void blur_picture_wrapped(struct picture *pic);
+static void parallel_blur_picture_wrapped (struct picture *pic);
+
 
   // function pointer look-up table for picture transformation functions
   static void (* const cmds[])(struct picture *) = { 
     parallel_row_blur,
     parallel_col_blur,
-    parallel_blur_picture,
-    blur_picture,
+    parallel_blur_picture_wrapped,
+    blur_picture_wrapped,
     parallel_sector_blur
   };
 
@@ -54,7 +57,7 @@ static void parallel_sector_blur(struct picture *pic);
   static char *cmd_strings[] = { 
     "parallel_row_blur",
     "parallel_col_blur",
-    "parallel_blur_picture",
+    "parallel_pixel_blur",
     "blur_picture",
     "parallel_sector_blur"
   };
@@ -291,4 +294,15 @@ static long long get_curr_time() {
   struct timeval time;
   gettimeofday(&time, NULL);
   return time.tv_sec * 1000LL + time.tv_usec / 1000; 
+}
+
+/* wrapper for the parallel_blur_picture function in PicProcess.c */
+static void parallel_blur_picture_wrapped (struct picture *pic) {
+  parallel_blur_picture(pic);
+
+}
+
+/* wrapper for the blur_picture function in PicProcess.c */
+static void blur_picture_wrapped(struct picture *pic) {
+  blur_picture(pic);
 }
